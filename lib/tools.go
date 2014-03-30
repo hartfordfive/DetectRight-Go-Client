@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"io/ioutil"
 )
 
 const (
@@ -112,18 +113,7 @@ func ParseConfigFile(filePath string) map[string]string {
 
 	r := bufio.NewReader(f)
 
-	params := map[string]string{
-		"log_base_dir":            "",
-		"server_ip":               "",
-		"server_port":             "",
-		"num_buff_lines":          "",
-		"redis_db_index":          "",
-		"flush_redis_db":          "",
-		"cookie_domain":           "",
-		"reporting_server_active": "",
-		"reporting_server_ip":     "",
-		"reporting_server_port":   "",
-	}
+	params := map[string]string{}
 
 	for err == nil {
 		s, err := Readln(r)
@@ -132,10 +122,7 @@ func ParseConfigFile(filePath string) map[string]string {
 		}
 		if err == nil && s != "" {
 			parts := strings.SplitN(s, "=", 2)
-			_, ok := params[parts[0]]
-			if ok {
-				params[parts[0]] = strings.Trim(parts[1], " ")
-			}
+			params[parts[0]] = strings.Trim(parts[1], " ")
 		}
 	}
 
@@ -375,30 +362,33 @@ func DateStampAsString() string {
 	return YmdToString() + " " + fmt.Sprintf("%02d", t.Hour()) + ":" + fmt.Sprintf("%02d", t.Minute()) + ":" + fmt.Sprintf("%02d", t.Second())
 }
 
-func UrlEncode(s string) (result string) {
-	for _, c := range s {
-		if c <= 0x7f { // single byte
-			result += fmt.Sprintf("%%%X", c)
-		} else if c > 0x1fffff { // quaternary byte
-			result += fmt.Sprintf("%%%X%%%X%%%X%%%X",
-				0xf0+((c&0x1c0000)>>18),
-				0x80+((c&0x3f000)>>12),
-				0x80+((c&0xfc0)>>6),
-				0x80+(c&0x3f),
-			)
-		} else if c > 0x7ff { // triple byte
-			result += fmt.Sprintf("%%%X%%%X%%%X",
-				0xe0+((c&0xf000)>>12),
-				0x80+((c&0xfc0)>>6),
-				0x80+(c&0x3f),
-			)
-		} else { // double byte
-			result += fmt.Sprintf("%%%X%%%X",
-				0xc0+((c&0x7c0)>>6),
-				0x80+(c&0x3f),
-			)
-		}
-	}
 
-	return result
+func GetUrlData(url string) string {
+     resp, err := http.Get("http://example.com/")
+     if err != nil {
+     	panic("could not fetch url!")
+     }
+     defer resp.Body.Close()
+     body, err := ioutil.ReadAll(resp.Body)
+     return string(body)
+}
+
+
+func UrlEncode(domain string, qsParams map[string]string) string {
+
+    var Url *url.URL
+    Url, err := url.Parse(domain) // E.g.:  http://www.yourdomain.com
+    if err != nil {
+        panic("Invalid domain")
+    }
+
+    Url.Path += ""
+    parameters := url.Values{}
+
+    for k,v := range qsParams {
+    	parameters.Add(k, v)
+    }
+
+    Url.RawQuery = parameters.Encode()
+    return Url.String()
 }
