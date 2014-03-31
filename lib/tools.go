@@ -364,12 +364,35 @@ func DateStampAsString() string {
 
 
 func GetUrlData(url string) string {
-     resp, err := http.Get("http://example.com/")
+     /*
+     resp, err := http.Get(url)
      if err != nil {
      	panic("could not fetch url!")
      }
      defer resp.Body.Close()
      body, err := ioutil.ReadAll(resp.Body)
+     return string(body)
+     */
+
+     client := &http.Client{}
+     req, err := http.NewRequest("GET", url, nil)
+     if err != nil {
+             panic(err)
+     }
+
+     req.Header.Set("User-Agent", "DetecRight Go Client v0.1.0")
+
+     resp, err := client.Do(req)
+     if err != nil {
+             panic(err)
+     }
+
+     defer resp.Body.Close()
+     body, err := ioutil.ReadAll(resp.Body)
+     if err != nil {
+             panic(err)
+     }
+
      return string(body)
 }
 
