@@ -1,38 +1,38 @@
 package main
 
 import (
-	"fmt"
-	"encoding/json"
 	"./lib"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 )
 
 const (
-      DEBUG = true
+	DEBUG = true
 )
 
 type DRClient struct {
-	baseUrl      string
-	actionDetect string
+	baseUrl           string
+	actionDetect      string
 	actionTestHeaders string
-	apiKey       string
-	properties   map[string]string
-	headers      map[string]string
+	apiKey            string
+	properties        map[string]string
+	headers           map[string]string
 }
 
 var drc = DRClient{
-	baseUrl:      "",
-	actionDetect: "detect.jsp",
+	baseUrl:           "",
+	actionDetect:      "detect.jsp",
 	actionTestHeaders: "getTestHeader.jsp?",
-	apiKey:       "",
-	properties:   map[string]string{},
-	headers:      map[string]string{},
+	apiKey:            "",
+	properties:        map[string]string{},
+	headers:           map[string]string{},
 }
 
-
 func (drc *DRClient) loadConf() {
-     conf:= tools.ParseConfigFile("detectright.conf")
-     drc.apiKey = conf["api_key"]
-     drc.baseUrl = conf["base_url"]
+	conf := tools.ParseConfigFile("detectright.conf")
+	drc.apiKey = conf["api_key"]
+	drc.baseUrl = conf["base_url"]
 }
 
 func (drc *DRClient) IsFilled() bool {
@@ -69,10 +69,10 @@ func (drc *DRClient) IsMobile() bool {
 
 func (drc *DRClient) GetTestHeaders() bool {
 
-     	if drc.apiKey == "" {
-	   conf:= tools.ParseConfigFile("detectright.conf")
-	   drc.apiKey = conf["api_key"]
-	   drc.baseUrl = conf["base_url"]
+	if drc.apiKey == "" {
+		conf := tools.ParseConfigFile("detectright.conf")
+		drc.apiKey = conf["api_key"]
+		drc.baseUrl = conf["base_url"]
 	}
 
 	payload := map[string]string{
@@ -80,15 +80,15 @@ func (drc *DRClient) GetTestHeaders() bool {
 		"k":  drc.apiKey,
 	}
 
-	jsonContent,_ := json.Marshal(payload)
-	
+	jsonContent, _ := json.Marshal(payload)
+
 	if DEBUG {
-	   fmt.Println("DEBUG: JSON Payload = ", string(jsonContent))
+		fmt.Println("DEBUG: JSON Payload = ", string(jsonContent))
 	}
 	url := tools.UrlEncode(drc.baseUrl+drc.actionTestHeaders, payload)
 
 	if DEBUG {
-	   fmt.Println("DEBUG: URL = ", url)
+		fmt.Println("DEBUG: URL = ", url)
 	}
 
 	drc.headers = drc.GetProfile(url)
@@ -97,60 +97,84 @@ func (drc *DRClient) GetTestHeaders() bool {
 }
 
 func (drc *DRClient) GetProperty(propname string) string {
-     return "property"     
+	return "property"
 }
 
 func (drc *DRClient) GetProperties() map[string]string {
-     return drc.properties
+	return drc.properties
 }
 
 func (drc *DRClient) GetHeaders() map[string]string {
-     return drc.headers
+	return drc.headers
 }
 
 /********** TODO ***************/
 func (drc *DRClient) SetHeadersFromUA(userAgent string) bool {
 
-     return true
+	return true
 }
 
+func (drc *DRClient) GetProfileFromHeaders() bool {
 
-/********** TODO ***************/
-func (drc *DRClient) GetProfileFromHeaders() map[string]string {
+	if drc.apiKey == "" {
+		conf := tools.ParseConfigFile("detectright.conf")
+		drc.apiKey = conf["api_key"]
+		drc.baseUrl = conf["base_url"]
+	}
 
-     res := map[string]string{
-         "property": "place_holder",
-     }
-     return res
+	payload := map[string]string{
+		"of":  "JSON",
+		"if":  "JSON",
+		"k":   drc.apiKey,
+		"raw": "0",
+		"h":   "",
+	}
+
+	headers,_ := json.Marshal(drc.headers)
+	payload["h"] = base64.StdEncoding.EncodeToString(headers)
+
+	jsonContent, _ := json.Marshal(payload)
+
+	if DEBUG {
+		fmt.Println("GetProfileFromHeaders DEBUG: JSON Payload = ", string(jsonContent))
+	}
+	url := tools.UrlEncode(drc.baseUrl+drc.actionTestHeaders, payload)
+
+	if DEBUG {
+		fmt.Println("GetProfileFromHeaders DEBUG: URL = ", url)
+	}
+
+	drc.headers = drc.GetProfile(url)
+
+	return true
+
 }
 
 func (drc *DRClient) GetProfile(url string) map[string]string {
 
-     res := map[string]string{}
+	res := map[string]string{}
 
-     if url == "" {
-     	return res
-     }
-     
-     properties := drc.GetContentResult(url)
-     
-     if DEBUG {
-     	fmt.Println("DEBUG: Result from "+url+"\n", properties)
-     } 
+	if url == "" {
+		return res
+	}
 
-     err := json.Unmarshal([]byte(properties), &res)
-     if err != nil {
-     	fmt.Println("error:", err)
-     }
-     
-     return res
+	properties := drc.GetContentResult(url)
+
+	if DEBUG {
+		fmt.Println("GetProfile DEBUG: Result from "+url+"\n", properties)
+	}
+
+	err := json.Unmarshal([]byte(properties), &res)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	return res
 }
-
 
 func (drc *DRClient) GetContentResult(url string) string {
-     return tools.GetUrlData(url)
+	return tools.GetUrlData(url)
 }
-
 
 func main() {
 
