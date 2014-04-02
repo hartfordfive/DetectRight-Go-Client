@@ -1,4 +1,4 @@
-package main
+package detectright
 
 import (
 	"./lib"
@@ -20,6 +20,7 @@ type DRClient struct {
 	headers           map[string]string
 }
 
+/*
 var drc = DRClient{
 	baseUrl:           "",
 	actionDetect:      "detect.jsp",
@@ -28,6 +29,7 @@ var drc = DRClient{
 	properties:        map[string]string{},
 	headers:           map[string]string{},
 }
+*/
 
 func (drc *DRClient) loadConf() {
 	conf := tools.ParseConfigFile("detectright.conf")
@@ -107,6 +109,12 @@ func (drc *DRClient) GetProperties() map[string]string {
 func (drc *DRClient) GetHeaders() map[string]string {
 	return drc.headers
 }
+
+
+func (drc *DRClient) SetHeaders(headers map[string]string) {
+     drc.headers = headers
+}
+
 
 /********** TODO ***************/
 func (drc *DRClient) SetHeadersFromUA(userAgent string) bool {
