@@ -2,12 +2,25 @@ package main
 
 import (
 	"detectright"
+	"encoding/json"
 	"fmt"
-	"lib"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 )
+
+func dateStampAsString() string {
+	t := time.Now()
+	return ymdToString() + " " + fmt.Sprintf("%02d", t.Hour()) + ":" + fmt.Sprintf("%02d", t.Minute()) + ":" + fmt.Sprintf("%02d", t.Second())
+}
+
+func ymdToString() string {
+	t := time.Now()
+	y, m, d := t.Date()
+	return strconv.Itoa(y) + fmt.Sprintf("%02d", m) + fmt.Sprintf("%02d", d)
+}
 
 type RequestHandler struct{}
 
@@ -25,25 +38,23 @@ func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 	//req.Header.Get("User-Agent")
 	fmt.Println(req.Header)
 
-	//var drc = detectright.DRClient{}
-	//fmt.Println("DRClient:", drc)
+	drc := detectright.InitClient()
 
-	drc := detectright.DRClient{
-		BaseUrl:           "",
-		ActionDetect:      "detect.jsp",
-		ActionTestHeaders: "getTestHeader.jsp?",
-		ApiKey:            "",
-		Properties:        map[string]string{},
-		Headers:           map[string]string{},
-		Debug:             true,
+	drcHeaders := make(map[string]interface{})
+	for k, v := range req.Header {
+		drcHeaders[k] = v[0]
 	}
 
-	fmt.Println("DRClient:", drc)
-	drc.LoadConf()
+	drc.SetHeaders(drcHeaders)
+	drc.GetProfileFromHeaders()
 
-	fmt.Println(req.Header)
-	drc.SetHeaders(req.Header)
+	response := map[string]interface{}{
+		"headers":  drc.GetHeaders(),
+		"response": drc.GetProperties(),
+	}
 
+	output, _ := json.Marshal(response)
+	fmt.Fprintf(res, string(output))
 }
 
 func main() {
@@ -60,7 +71,7 @@ func main() {
 		wg.Done()
 	}()
 
-	fmt.Println("[" + tools.DateStampAsString() + "] Logging server started on 0.0.0.0:8088")
+	fmt.Println("[" + dateStampAsString() + "] Logging server started on 0.0.0.0:8088")
 
 	wg.Wait()
 
