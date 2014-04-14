@@ -30,14 +30,11 @@ type DRClient struct {
 	debugMode         int
 }
 
-/************************************
-	       Utility functions
-*************************************/
 func getVersion() string {
 	return strconv.Itoa(VERSION_MAJOR) + "." + strconv.Itoa(VERSION_MINOR) + "." + strconv.Itoa(VERSION_PATCH) + "-" + VERSION_SUFFIX
 }
 
-func parseConfigFile(filePath string) map[string]string {
+func (drc *DRClient) parseConfigFile(filePath string) map[string]string {
 
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -52,7 +49,7 @@ func parseConfigFile(filePath string) map[string]string {
 	params := map[string]string{}
 
 	for err == nil {
-		s, err := readln(r)
+		s, err := drc.readln(r)
 		if err != nil {
 			break
 		}
@@ -65,7 +62,8 @@ func parseConfigFile(filePath string) map[string]string {
 	return params
 }
 
-func getUrlData(url string) string {
+// Description: Fethches a given url
+func (drc *DRClient) getUrlData(url string) string {
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
@@ -89,7 +87,8 @@ func getUrlData(url string) string {
 	return string(body)
 }
 
-func urlEncode(domain string, qsParams map[string]string) string {
+// Description: Encodes the given query string map as a url-encoded string
+func (drc *DRClient) urlEncode(domain string, qsParams map[string]string) string {
 
 	var Url *url.URL
 	Url, err := url.Parse(domain) // E.g.:  http://www.yourdomain.com
@@ -108,7 +107,7 @@ func urlEncode(domain string, qsParams map[string]string) string {
 	return Url.String()
 }
 
-func readln(r *bufio.Reader) (string, error) {
+func (drc *DRClient) readln(r *bufio.Reader) (string, error) {
 	var (
 		isPrefix bool  = true
 		err      error = nil
@@ -121,10 +120,7 @@ func readln(r *bufio.Reader) (string, error) {
 	return string(ln), err
 }
 
-/************************************
-				DetectRight client functions
-*************************************/
-
+// Description: Initializes the DRClient and loads the config file
 func InitClient() *DRClient {
 
 	/* Initialize an instance of the client */
@@ -135,47 +131,29 @@ func InitClient() *DRClient {
 		apiKey:            "",
 		properties:        map[string]interface{}{},
 		headers:           map[string]interface{}{},
-		debugMode:         false,
+		debugMode:         0,
 	}
 	/* Then load the config and return the DRClient instance */
-	drc.LoadConf()
+	drc.loadConf()
 	return drc
 }
 
-func (drc *DRClient) LoadConf() {
-	conf := parseConfigFile("detectright.conf")
+// Description: loads the application configuration file
+func (drc *DRClient) loadConf() {
+	conf := drc.parseConfigFile("detectright.conf")
 	drc.apiKey = conf["api_key"]
 	drc.baseUrl = conf["base_url"]
 	drc.actionDetect = conf["action_detect"]
 	drc.actionTestHeaders = conf["action_test_headers"]
-	drc.debugMode = strconfig["debug"]
-}
-
-func (drc *DRClient) IsFilled() bool {
-	if len(drc.properties) >= 1 {
-		return true
+	dm, err := strconv.Atoi(conf["debug"])
+	if err == nil {
+		drc.debugMode = dm
+	} else {
+		drc.debugMode = 0
 	}
-	return false
 }
 
-func (drc *DRClient) IsEmpty() bool {
-	return len(drc.properties) == 0
-}
-
-func (drc *DRClient) IsReady() bool {
-	return len(drc.headers) > 0
-}
-
-func (drc *DRClient) Prepare() bool {
-	if drc.IsEmpty() == true {
-		if drc.IsReady() == false {
-			return false
-		}
-		drc.GetProfileFromHeaders()
-	}
-	return false
-}
-
+// Description: Determines if the client is mobile or not
 func (drc *DRClient) IsMobile() bool {
 	if drc.GetProperty("mobile") == "1" || drc.GetProperty("mobile") == "yes" {
 		return true
@@ -183,7 +161,8 @@ func (drc *DRClient) IsMobile() bool {
 	return false
 }
 
-func (drc *DRClient) GetTestHeaders() bool {
+// Description:
+func (drc *DRClient) SetTestHeaders() bool {
 
 	if drc.apiKey == "" {
 		return false
@@ -195,14 +174,15 @@ func (drc *DRClient) GetTestHeaders() bool {
 	}
 
 	jsonContent, _ := json.Marshal(payload)
+	url := drc.urlEncode(drc.baseUrl+drc.actionTestHeaders, payload)
 
 	if drc.debugMode == 1 {
-		fmt.Println("GetTestHeaders URL:\n", url)
-		fmt.Println("GetTestHeaders JSON Payload:\n", string(jsonContent), "\n------------------\n")
+		fmt.Println("SetTestHeaders URL:\n", url)
+		fmt.Println("SetTestHeaders JSON Payload:\n", string(jsonContent), "\n------------------\n")
 	}
-	url := urlEncode(drc.baseUrl+drc.actionTestHeaders, payload)
 
-	drc.headers = drc.GetProfile(url)
+	drc.headers = drc.getProfile(url)
+	fmt.Println(drc.GetHeaders())
 
 	return true
 }
@@ -258,20 +238,20 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 	payload["h"] = base64.StdEncoding.EncodeToString(headers)
 
 	jsonContent, _ := json.Marshal(payload)
+	url := drc.urlEncode(drc.baseUrl+drc.actionDetect, payload)
 
 	if drc.debugMode == 1 {
 		fmt.Println("GetProfileFromHeaders URL:\n", url)
 		fmt.Println("GetProfileFromHeaders JSON Payload:\n", string(jsonContent), "\n------------------\n")
 	}
-	url := urlEncode(drc.baseUrl+drc.actionDetect, payload)
 
-	drc.properties = drc.GetProfile(url)
+	drc.properties = drc.getProfile(url)
 
 	return true
 
 }
 
-func (drc *DRClient) GetProfile(url string) map[string]interface{} {
+func (drc *DRClient) getProfile(url string) map[string]interface{} {
 
 	res := map[string]interface{}{}
 
@@ -279,10 +259,10 @@ func (drc *DRClient) GetProfile(url string) map[string]interface{} {
 		return res
 	}
 
-	properties := drc.GetContentResult(url)
+	properties := drc.getUrlData(url)
 
 	if drc.debugMode == 1 {
-		fmt.Println("GetProfile Result:\n", properties, "\n------------------\n")
+		fmt.Println("getProfile Result:\n", properties, "\n------------------\n")
 	}
 
 	err := json.Unmarshal([]byte(properties), &res)
@@ -291,8 +271,4 @@ func (drc *DRClient) GetProfile(url string) map[string]interface{} {
 	}
 
 	return res
-}
-
-func (drc *DRClient) GetContentResult(url string) string {
-	return getUrlData(url)
 }

@@ -1,5 +1,5 @@
 api_key=[API_KEY]
 base_url=[API_BASE_URL]
 action_detect=detect.jsp
-action_test_headers=getTestHeaders.jsp
+action_test_headers=getTestHeader.jsp
 debug=0

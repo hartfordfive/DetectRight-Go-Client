@@ -35,18 +35,21 @@ func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	//req.Header.Get("User-Agent")
-	fmt.Println(req.Header)
-
+	// Initialize the DetectRigh Go client
 	drc := detectright.InitClient()
 
+	// Store all the headers from the current request in header map
 	drcHeaders := make(map[string]interface{})
 	for k, v := range req.Header {
 		drcHeaders[k] = v[0]
 	}
 
+	// Sets the headers of the current rquest
 	drc.SetHeaders(drcHeaders)
+
+	// Fetches the device profile from HQ with the collected headers
 	drc.GetProfileFromHeaders()
+	drc.SetTestHeaders()
 
 	response := map[string]interface{}{
 		"headers":  drc.GetHeaders(),
@@ -55,6 +58,7 @@ func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 
 	output, _ := json.Marshal(response)
 	fmt.Fprintf(res, string(output))
+
 }
 
 func main() {
