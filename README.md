@@ -19,10 +19,10 @@ drc := detectright.InitClient()
 
 // Store all the headers from the current request in header map<br/>
 <code>
-drcHeaders := make(map[string]interface{})
-for k, v := range req.Header {
-  drcHeaders[k] = v[0]
-}
+drcHeaders := make(map[string]interface{})<br/>
+for k, v := range req.Header {<br/>
+  drcHeaders[k] = v[0]<br/>
+}<br/>
 </code><br/>
 
 // Sets the headers of the current rquest<br/>
