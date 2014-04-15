@@ -12,30 +12,22 @@ Ported to the Go language by Alain Lefebvre
 ## Usage Example
 ====================
 
-// Initialize the DetectRigh Go client<br/>
-<code>
+<pre><code>
+// Initialize the DetectRigh Go client
 drc := detectright.InitClient()
-</code><br/>
 
-// Store all the headers from the current request in header map<br/>
-<code>
-drcHeaders := make(map[string]interface{})<br/>
-for k, v := range req.Header {<br/>
-  drcHeaders[k] = v[0]<br/>
-}<br/>
-</code><br/>
+// Store all the headers from the current request in header map
+drcHeaders := make(map[string]interface{})
+for k, v := range req.Header {
+  drcHeaders[k] = v[0]
+}
 
-// Sets the headers of the current rquest<br/>
-<code>
+// Sets the headers of the current rquest
 drc.SetHeaders(drcHeaders)
-</code><br/>
 
-// Fetches the device profile from HQ with the collected headers<br/>
-<code>
+// Fetches the device profile from HQ with the collected headers
 drc.GetProfileFromHeaders()
-</code><br/>
 
-// Get all the profile properties<br/>
-<code>
+// Get all the profile properties
 response := drc.GetProperties()
-</code><br/>
+</code></pre>
