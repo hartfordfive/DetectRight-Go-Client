@@ -9,7 +9,7 @@ Ported to the Go language by Alain Lefebvre
 
 
 
-## Usage Examplen
+## Usage Example
 ====================
 
 // Initialize the DetectRigh Go client
