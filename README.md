@@ -9,5 +9,25 @@ Ported to the Go language by Alain Lefebvre
 
 
 
-## API Documentation
+## Usage Examplen
 ====================
+
+// Initialize the DetectRigh Go client
+drc := detectright.InitClient()
+
+// Store all the headers from the current request in header map
+drcHeaders := make(map[string]interface{})
+for k, v := range req.Header {
+  drcHeaders[k] = v[0]
+}
+
+// Sets the headers of the current rquest
+drc.SetHeaders(drcHeaders)
+
+// Fetches the device profile from HQ with the collected headers
+drc.GetProfileFromHeaders()
+
+
+// Get all the profile properties
+response := drc.GetProperties()
+
