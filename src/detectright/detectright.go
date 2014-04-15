@@ -62,7 +62,7 @@ func (drc *DRClient) parseConfigFile(filePath string) map[string]string {
 	return params
 }
 
-// Description: Fethches a given url
+// Fethches a given url
 func (drc *DRClient) getUrlData(url string) string {
 
 	client := &http.Client{}
@@ -87,7 +87,7 @@ func (drc *DRClient) getUrlData(url string) string {
 	return string(body)
 }
 
-// Description: Encodes the given query string map as a url-encoded string
+// Encodes the given query string map as a url-encoded string
 func (drc *DRClient) urlEncode(domain string, qsParams map[string]string) string {
 
 	var Url *url.URL
@@ -120,7 +120,7 @@ func (drc *DRClient) readln(r *bufio.Reader) (string, error) {
 	return string(ln), err
 }
 
-// Description: Initializes the DRClient and loads the config file
+// Initializes the DRClient and loads the config file
 func InitClient() *DRClient {
 
 	/* Initialize an instance of the client */
@@ -138,7 +138,7 @@ func InitClient() *DRClient {
 	return drc
 }
 
-// Description: loads the application configuration file
+// Loads the application configuration file
 func (drc *DRClient) loadConf() {
 	conf := drc.parseConfigFile("detectright.conf")
 	drc.apiKey = conf["api_key"]
@@ -153,7 +153,7 @@ func (drc *DRClient) loadConf() {
 	}
 }
 
-// Description: Determines if the client is mobile or not
+// Determines if the client is mobile or not
 func (drc *DRClient) IsMobile() bool {
 	if drc.GetProperty("mobile") == "1" || drc.GetProperty("mobile") == "yes" {
 		return true
@@ -161,7 +161,8 @@ func (drc *DRClient) IsMobile() bool {
 	return false
 }
 
-// Description:
+// Retreives test headers for the DetectRight server and sets them
+// as the headers for the current device profile request
 func (drc *DRClient) SetTestHeaders() bool {
 
 	if drc.apiKey == "" {
@@ -178,17 +179,26 @@ func (drc *DRClient) SetTestHeaders() bool {
 
 	if drc.debugMode == 1 {
 		fmt.Println("SetTestHeaders URL:\n", url)
-		fmt.Println("SetTestHeaders JSON Payload:\n", string(jsonContent), "\n------------------\n")
+		fmt.Println("SetTestHeaders JSON Payload:\n", string(jsonContent))
 	}
 
 	drc.headers = drc.getProfile(url)
-	fmt.Println(drc.GetHeaders())
+	if drc.debugMode == 1 {
+		fmt.Println("SetTestHeaders Result:\n", drc.GetHeaders(), "\n------------------\n")
+	}
 
 	return true
 }
 
+// Attempts to retreive the given property from the current
+// map of properties.  Will fail and return an empty string in the case
+// the property doesn't exist or if the properties haven't been fetched
+// from the DetectRight API yet.
 func (drc *DRClient) GetProperty(propname string) interface{} {
 	prop := drc.properties[propname]
+	if prop == nil {
+		return ""
+	}
 	switch prop.(type) {
 	case string:
 		retVal, _ := prop.(string)
@@ -204,22 +214,28 @@ func (drc *DRClient) GetProperty(propname string) interface{} {
 	return retVal
 }
 
+// Returns all the properties from the current property map
 func (drc *DRClient) GetProperties() map[string]interface{} {
 	return drc.properties
 }
 
+// Returns all headers in the current headers map
 func (drc *DRClient) GetHeaders() map[string]interface{} {
 	return drc.headers
 }
 
+// Sets the header map for the device profile API request
 func (drc *DRClient) SetHeaders(headers map[string]interface{}) {
 	drc.headers = headers
 }
 
+// Sets the headers for the device profile API request to contain only
+// the specified user agent
 func (drc *DRClient) SetHeadersFromUA(userAgent string) {
 	drc.headers = map[string]interface{}{"HTTP_USER_AGENT": userAgent}
 }
 
+// Attempts to retreive a device profile based on the current headers
 func (drc *DRClient) GetProfileFromHeaders() bool {
 
 	if drc.apiKey == "" {
