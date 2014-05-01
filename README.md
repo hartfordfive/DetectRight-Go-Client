@@ -7,6 +7,11 @@ Original code and web service created by Chris Abbott.
 
 Ported to the Go language by Alain Lefebvre
 
+## Installation
+
+Simply intsall the package with the "go get" tool:
+
+go get github.com/DetectRight/DetectRight-Go-Client/detectright
 
 
 ## Usage Example
