@@ -49,7 +49,7 @@ func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 
 	// Fetches the device profile from HQ with the collected headers
 	drc.GetProfileFromHeaders()
-	drc.SetTestHeaders()
+	//drc.SetTestHeaders()
 
 	response := map[string]interface{}{
 		"headers":  drc.GetHeaders(),
