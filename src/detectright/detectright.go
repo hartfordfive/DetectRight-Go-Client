@@ -18,22 +18,41 @@ import (
 
 const (
 	VERSION_MAJOR  int    = 0
-	VERSION_MINOR  int    = 1
+	VERSION_MINOR  int    = 2
 	VERSION_PATCH  int    = 0
 	VERSION_SUFFIX string = "beta"
 	CACHE_TTL_MINS int    = 5
 )
 
+
 type DRClient struct {
 	baseUrl           string
 	actionDetect      string
 	actionTestHeaders string
+	actionAnalytics	  string
 	apiKey            string
 	properties        map[string]interface{}
 	headers           map[string]interface{}
 	debugMode         int
 	localCache        *ccache.Cache
+	profileHits	  map[string]map[string]interface{}
+	profileHitsBuffer int16
 }
+
+/*
+	The profileHits property should contain the following:
+		{
+			"[dr.browserid]": {
+				"ts": "[TIMESTAMP]",
+				"page_url": "[PAGE_URL]",
+				"dr_udid": "[DR_DEVICE_UDID]",
+				"referrer": "[HTTP_REFERRER]",
+			}
+		}
+		
+
+*/
+
 
 func getVersion() string {
 	return strconv.Itoa(VERSION_MAJOR) + "." + strconv.Itoa(VERSION_MINOR) + "." + strconv.Itoa(VERSION_PATCH) + "-" + VERSION_SUFFIX
@@ -133,11 +152,14 @@ func InitClient() *DRClient {
 		baseUrl:           "",
 		actionDetect:      "",
 		actionTestHeaders: "",
+		actionAnalytics:   "",
 		apiKey:            "",
 		properties:        map[string]interface{}{},
 		headers:           map[string]interface{}{},
 		debugMode:         0,
 		localCache:        ccache.New(ccache.Configure().MaxItems(16777216).ItemsToPrune(100)),
+		profileHits:       map[string]map[string]interface{}{},
+	 	profileHitsBuffer: 10
 	}
 	/* Then load the config and return the DRClient instance */
 	drc.loadConf()
@@ -277,6 +299,27 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 
 		drc.properties = cachedOjb
 		drc.properties["profile_source"] = "cache"
+
+		// Finally, make sure to increment the profile hit count
+		// We will use the DR browser ID (id.browser)
+		if _,ok := drc.profileHits.item[drc.properties["id.browser"]]; !ok {
+			_,hasReferrer := drc.properties["Referrer"];
+			if hasReferrer {
+				referrer := drc.properties["Referrer"]
+			} else {
+				referrer := ""
+			}
+			drc.profileHits.item[drc.properties["id.browser"]] =: map[string]interface{
+				"ts": 0,
+				"page_url": "http://pageurl.com",
+				"dr_udid": "asdf1234"				
+				"user_agent": ua,
+				"referrer": referrer,
+			}				
+		} else {
+
+		}
+
 		return true
 	} else if cachedProfile == nil && drc.debugMode == 1 {
 		fmt.Println("Profile object not found in cache!")
