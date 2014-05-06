@@ -2,15 +2,18 @@ package detectright
 
 import (
 	"bufio"
+	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/karlseguin/ccache"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,6 +21,7 @@ const (
 	VERSION_MINOR  int    = 1
 	VERSION_PATCH  int    = 0
 	VERSION_SUFFIX string = "beta"
+	CACHE_TTL_MINS int    = 5
 )
 
 type DRClient struct {
@@ -28,6 +32,7 @@ type DRClient struct {
 	properties        map[string]interface{}
 	headers           map[string]interface{}
 	debugMode         int
+	localCache        *ccache.Cache
 }
 
 func getVersion() string {
@@ -132,6 +137,7 @@ func InitClient() *DRClient {
 		properties:        map[string]interface{}{},
 		headers:           map[string]interface{}{},
 		debugMode:         0,
+		localCache:        ccache.New(ccache.Configure().MaxItems(16777216).ItemsToPrune(100)),
 	}
 	/* Then load the config and return the DRClient instance */
 	drc.loadConf()
@@ -151,6 +157,10 @@ func (drc *DRClient) loadConf() {
 	} else {
 		drc.debugMode = 0
 	}
+}
+
+func (drc *DRClient) GetUA() {
+
 }
 
 // Determines if the client is mobile or not
@@ -238,6 +248,40 @@ func (drc *DRClient) SetHeadersFromUA(userAgent string) {
 // Attempts to retreive a device profile based on the current headers
 func (drc *DRClient) GetProfileFromHeaders() bool {
 
+	// Check if the item is in the local cache, and if so, fetch it
+	// and return it immediately
+	ua := drc.headers["User-Agent"]
+	h := sha1.New()
+	h.Write([]byte(ua.(string)))
+	uaHash := base64.URLEncoding.EncodeToString(h.Sum(nil)[:])
+
+	cachedProfile := drc.localCache.Get(uaHash)
+
+	if drc.debugMode == 1 {
+		fmt.Println("Device UA:", ua)
+		fmt.Println("Device Hash:", uaHash)
+	}
+
+	// If we obtained a valid cache object, then decode it and return it
+	if cachedProfile != nil {
+		if drc.debugMode == 1 {
+			fmt.Println("Profile object found in cache!")
+		}
+
+		cp, _ := cachedProfile.(string)
+		cachedOjb := map[string]interface{}{}
+		err := json.Unmarshal([]byte(cp), &cachedOjb)
+		if err != nil {
+			fmt.Println("JSON parsing error:", err)
+		}
+
+		drc.properties = cachedOjb
+		drc.properties["profile_source"] = "cache"
+		return true
+	} else if cachedProfile == nil && drc.debugMode == 1 {
+		fmt.Println("Profile object not found in cache!")
+	}
+
 	if drc.apiKey == "" {
 		return false
 	}
@@ -261,7 +305,15 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		fmt.Println("GetProfileFromHeaders JSON Payload:\n", string(jsonContent), "\n------------------\n")
 	}
 
-	drc.properties = drc.getProfile(url)
+	profile := drc.getProfile(url)
+
+	// Store in local cache
+	jsonObject, _ := json.Marshal(profile)
+
+	drc.localCache.Set(uaHash, string(jsonObject), time.Minute*5)
+
+	drc.properties = profile
+	drc.properties["profile_source"] = "api"
 
 	return true
 
