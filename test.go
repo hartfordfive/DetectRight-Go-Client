@@ -24,6 +24,8 @@ func ymdToString() string {
 
 type RequestHandler struct{}
 
+var drc = detectright.InitClient()
+
 func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if req.URL.Path != "/" {
@@ -36,7 +38,7 @@ func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 	}
 
 	// Initialize the DetectRigh Go client
-	drc := detectright.InitClient()
+	//drc := detectright.InitClient()
 
 	// Store all the headers from the current request in header map
 	drcHeaders := make(map[string]interface{})

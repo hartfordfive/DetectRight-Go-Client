@@ -257,8 +257,6 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 
 	cachedProfile := drc.localCache.Get(uaHash)
 
-	fmt.Println("Cache OBJ:", cachedProfile)
-
 	if drc.debugMode == 1 {
 		fmt.Println("Device UA:", ua)
 		fmt.Println("Device Hash:", uaHash)
@@ -269,13 +267,16 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		if drc.debugMode == 1 {
 			fmt.Println("Profile object found in cache!")
 		}
+
+		cp, _ := cachedProfile.(string)
 		cachedOjb := map[string]interface{}{}
-		err := json.Unmarshal([]byte(cachedProfile.([]byte)), &cachedOjb)
+		err := json.Unmarshal([]byte(cp), &cachedOjb)
 		if err != nil {
 			fmt.Println("JSON parsing error:", err)
 		}
+
 		drc.properties = cachedOjb
-		drc.properties["source"] = "cache"
+		drc.properties["profile_source"] = "cache"
 		return true
 	} else if cachedProfile == nil && drc.debugMode == 1 {
 		fmt.Println("Profile object not found in cache!")
@@ -309,15 +310,10 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 	// Store in local cache
 	jsonObject, _ := json.Marshal(profile)
 
-	if drc.debugMode == 1 {
-		fmt.Println("Object Key:", uaHash)
-		fmt.Println("Object value:", string(jsonObject))
-	}
-
 	drc.localCache.Set(uaHash, string(jsonObject), time.Minute*5)
 
 	drc.properties = profile
-	drc.properties["source"] = "api"
+	drc.properties["profile_source"] = "api"
 
 	return true
 
