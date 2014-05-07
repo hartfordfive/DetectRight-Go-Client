@@ -24,19 +24,26 @@ const (
 	CACHE_TTL_MINS int    = 5
 )
 
-
 type DRClient struct {
 	baseUrl           string
 	actionDetect      string
 	actionTestHeaders string
-	actionAnalytics	  string
+	actionAnalytics   string
 	apiKey            string
 	properties        map[string]interface{}
 	headers           map[string]interface{}
 	debugMode         int
 	localCache        *ccache.Cache
-	profileHits	  map[string]map[string]interface{}
+	profileHits       map[string]PageVisit
 	profileHitsBuffer int16
+}
+
+type PageVisit struct {
+	ts        int32
+	pageUrl   string
+	drUdid    string
+	userAgent string
+	referrer  string
 }
 
 /*
@@ -49,10 +56,9 @@ type DRClient struct {
 				"referrer": "[HTTP_REFERRER]",
 			}
 		}
-		
+
 
 */
-
 
 func getVersion() string {
 	return strconv.Itoa(VERSION_MAJOR) + "." + strconv.Itoa(VERSION_MINOR) + "." + strconv.Itoa(VERSION_PATCH) + "-" + VERSION_SUFFIX
@@ -158,8 +164,8 @@ func InitClient() *DRClient {
 		headers:           map[string]interface{}{},
 		debugMode:         0,
 		localCache:        ccache.New(ccache.Configure().MaxItems(16777216).ItemsToPrune(100)),
-		profileHits:       map[string]map[string]interface{}{},
-	 	profileHitsBuffer: 10
+		profileHits:       map[string]PageVisit{},
+		profileHitsBuffer: 10,
 	}
 	/* Then load the config and return the DRClient instance */
 	drc.loadConf()
@@ -302,22 +308,25 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 
 		// Finally, make sure to increment the profile hit count
 		// We will use the DR browser ID (id.browser)
-		if _,ok := drc.profileHits.item[drc.properties["id.browser"]]; !ok {
-			_,hasReferrer := drc.properties["Referrer"];
-			if hasReferrer {
-				referrer := drc.properties["Referrer"]
-			} else {
-				referrer := ""
-			}
-			drc.profileHits.item[drc.properties["id.browser"]] =: map[string]interface{
-				"ts": 0,
-				"page_url": "http://pageurl.com",
-				"dr_udid": "asdf1234"				
-				"user_agent": ua,
-				"referrer": referrer,
-			}				
-		} else {
+		if _, ok := drc.profileHits[drc.properties["id.browser"].(string)]; !ok {
 
+			referrer := ""
+			_, hasReferrer := drc.properties["Referrer"]
+			if hasReferrer {
+				referrer = drc.properties["Referrer"].(string)
+			}
+
+			browser_id := drc.properties["id.browser"].(string)
+			rf, _ := referrer.(string)
+			drc.profileHits[browser_id] = map[string]PageVisit{
+				"ts":         0,
+				"page_url":   "http://pageurl.com",
+				"dr_udid":    "asdf1234",
+				"user_agent": ua,
+				"referrer":   rf,
+			}
+		} else {
+			fmt.Println("Index already set...incrementing value")
 		}
 
 		return true
