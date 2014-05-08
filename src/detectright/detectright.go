@@ -2,6 +2,7 @@ package detectright
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
@@ -34,31 +35,18 @@ type DRClient struct {
 	headers           map[string]interface{}
 	debugMode         int
 	localCache        *ccache.Cache
-	profileHits       map[string]PageVisit
-	profileHitsBuffer int16
+	profileHits       []*PageVisit
+	profileHitsBuffer int
 }
 
 type PageVisit struct {
-	ts        int32
-	pageUrl   string
-	drUdid    string
-	userAgent string
-	referrer  string
+	ts          int32
+	drBrowserId string
+	pageUrl     string
+	drUdid      string
+	userAgent   string
+	referrer    string
 }
-
-/*
-	The profileHits property should contain the following:
-		{
-			"[dr.browserid]": {
-				"ts": "[TIMESTAMP]",
-				"page_url": "[PAGE_URL]",
-				"dr_udid": "[DR_DEVICE_UDID]",
-				"referrer": "[HTTP_REFERRER]",
-			}
-		}
-
-
-*/
 
 func getVersion() string {
 	return strconv.Itoa(VERSION_MAJOR) + "." + strconv.Itoa(VERSION_MINOR) + "." + strconv.Itoa(VERSION_PATCH) + "-" + VERSION_SUFFIX
@@ -164,8 +152,8 @@ func InitClient() *DRClient {
 		headers:           map[string]interface{}{},
 		debugMode:         0,
 		localCache:        ccache.New(ccache.Configure().MaxItems(16777216).ItemsToPrune(100)),
-		profileHits:       map[string]PageVisit{},
-		profileHitsBuffer: 10,
+		profileHits:       []*PageVisit{},
+		profileHitsBuffer: 3,
 	}
 	/* Then load the config and return the DRClient instance */
 	drc.loadConf()
@@ -273,12 +261,56 @@ func (drc *DRClient) SetHeadersFromUA(userAgent string) {
 	drc.headers = map[string]interface{}{"HTTP_USER_AGENT": userAgent}
 }
 
+func (drc *DRClient) ReportAnalyticsToHQ() {
+
+	apiUrl := "http://www.whatsmydevice.mobi"
+	resource := "/analytics/"
+	data := url.Values{}
+
+	var pv []PageVisit
+
+	for _, v := range drc.profileHits {
+		pv = append(pv, *v)
+	}
+
+	fmt.Println(pv)
+
+	payload, err := json.Marshal(pv)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("Payload to send:", string(payload))
+	data.Set("data", string(payload))
+
+	u, _ := url.ParseRequestURI(apiUrl)
+	u.Path = resource
+	urlStr := fmt.Sprintf("%v", u) // "https://api.com/user/"
+
+	client := &http.Client{}
+	r, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(data.Encode())) // <-- URL-encoded payload
+	r.Header.Add("Authorization", "auth_token=\"XXXXXXX\"")
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+
+	resp, _ := client.Do(r)
+	fmt.Println(resp.Status)
+
+	drc.profileHits = make([]*PageVisit, drc.profileHitsBuffer)
+
+}
+
 // Attempts to retreive a device profile based on the current headers
 func (drc *DRClient) GetProfileFromHeaders() bool {
 
 	// Check if the item is in the local cache, and if so, fetch it
 	// and return it immediately
 	ua := drc.headers["User-Agent"]
+	var u string
+	if v, ok := ua.(string); ok {
+		u = v
+	}
+
 	h := sha1.New()
 	h.Write([]byte(ua.(string)))
 	uaHash := base64.URLEncoding.EncodeToString(h.Sum(nil)[:])
@@ -292,6 +324,7 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 
 	// If we obtained a valid cache object, then decode it and return it
 	if cachedProfile != nil {
+
 		if drc.debugMode == 1 {
 			fmt.Println("Profile object found in cache!")
 		}
@@ -306,28 +339,33 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		drc.properties = cachedOjb
 		drc.properties["profile_source"] = "cache"
 
+		// Now check if the buffer is full, if so, then send
+		// the analytics requests to HQ and empty the buffer
+		if len(drc.profileHits) >= drc.profileHitsBuffer {
+			go func() {
+				drc.ReportAnalyticsToHQ()
+			}()
+		}
+
 		// Finally, make sure to increment the profile hit count
 		// We will use the DR browser ID (id.browser)
-		if _, ok := drc.profileHits[drc.properties["id.browser"].(string)]; !ok {
 
-			referrer := ""
-			_, hasReferrer := drc.properties["Referrer"]
-			if hasReferrer {
-				referrer = drc.properties["Referrer"].(string)
-			}
-
-			browser_id := drc.properties["id.browser"].(string)
-			rf, _ := referrer.(string)
-			drc.profileHits[browser_id] = map[string]PageVisit{
-				"ts":         0,
-				"page_url":   "http://pageurl.com",
-				"dr_udid":    "asdf1234",
-				"user_agent": ua,
-				"referrer":   rf,
-			}
-		} else {
-			fmt.Println("Index already set...incrementing value")
+		referrer := ""
+		_, hasReferrer := drc.properties["Referrer"]
+		if hasReferrer {
+			referrer = drc.properties["Referrer"].(string)
 		}
+
+		browser_id, _ := drc.properties["id.browser"].(string)
+
+		drc.profileHits = append(drc.profileHits, &PageVisit{
+			ts:          int32(time.Now().Unix()),
+			drBrowserId: browser_id,
+			pageUrl:     "http://pageurl.com",
+			drUdid:      "asdf1234",
+			userAgent:   u,
+			referrer:    referrer,
+		})
 
 		return true
 	} else if cachedProfile == nil && drc.debugMode == 1 {
