@@ -7,6 +7,11 @@ Original code and web service created by Chris Abbott.
 
 Ported to the Go language by Alain Lefebvre
 
+## Installation
+
+Simply intsall the package with the "go get" tool:
+
+go get github.com/DetectRight/DetectRight-Go-Client/detectright
 
 
 ## Usage Example
@@ -31,3 +36,9 @@ drc.GetProfileFromHeaders()
 // Get all the profile properties
 response := drc.GetProperties()
 </code></pre>
+
+
+## Future Roadmap
+===================
+- Add in process caching in order to speed up retreive of device profiles
+- Create in-memory device profile access counter in order to accumulate stats and send back to DR HQ for analytics puproses.
