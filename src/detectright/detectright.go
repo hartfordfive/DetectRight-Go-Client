@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,15 +38,17 @@ type DRClient struct {
 	localCache        *ccache.Cache
 	profileHits       []*PageVisit
 	profileHitsBuffer int
+	request           *http.Request
+	mutex             *sync.Mutex
 }
 
 type PageVisit struct {
-	ts          int32
-	drBrowserId string
-	pageUrl     string
-	drUdid      string
-	userAgent   string
-	referrer    string
+	TS          int32
+	DrBrowserId string
+	PageUrl     string
+	DrUdid      string
+	UA          string
+	Referrer    string
 }
 
 func getVersion() string {
@@ -153,7 +156,9 @@ func InitClient() *DRClient {
 		debugMode:         0,
 		localCache:        ccache.New(ccache.Configure().MaxItems(16777216).ItemsToPrune(100)),
 		profileHits:       []*PageVisit{},
-		profileHitsBuffer: 3,
+		profileHitsBuffer: 1,
+		request:           nil,
+		mutex:             &sync.Mutex{},
 	}
 	/* Then load the config and return the DRClient instance */
 	drc.loadConf()
@@ -176,7 +181,7 @@ func (drc *DRClient) loadConf() {
 }
 
 func (drc *DRClient) GetUA() {
-
+	//return drc.properties["User-Agent"].(string)
 }
 
 // Determines if the client is mobile or not
@@ -300,6 +305,53 @@ func (drc *DRClient) ReportAnalyticsToHQ() {
 
 }
 
+func (drc *DRClient) ReportAnalyticsToHQ2() {
+
+	apiUrl := "http://httpbin.org/post"
+
+	var pv []string
+	for _, v := range drc.profileHits {
+		ov := *v
+		val, _ := json.Marshal(ov)
+		fmt.Println("\tVal:", string(val))
+		pv = append(pv, string(val))
+	}
+
+	// Reset the pagve visits
+	fmt.Println("Profile hits:", len(drc.profileHits))
+	fmt.Println("Resetting profile hits!")
+	drc.profileHits = []*PageVisit{}
+	fmt.Println("Profile hits:", len(drc.profileHits))
+
+	//fmt.Println("Val2:", pv)
+
+	// Copy the profile hits to a temp slice
+	// then emtpy the active slice
+	/*
+		drc.mutex.Lock()
+		var pvt []*PageVisit
+		drc.profileHits = make([]*PageVisit, drc.profileHitsBuffer)
+		drc.mutex.Unlock()
+	*/
+
+	buf, _ := json.Marshal(pv)
+	body := bytes.NewBuffer(buf)
+	r, _ := http.Post(apiUrl, "application/json", body)
+	response, _ := ioutil.ReadAll(r.Body)
+
+	fmt.Println("Response:", string(response))
+	/*
+		fmt.Println("Slice:", drc.profileHits)
+		fmt.Println("Body:", body)
+		fmt.Println("Status:", r.Status)
+		fmt.Println("Response:", string(response))
+	*/
+}
+
+func (drc *DRClient) SetHttpRequest(req *http.Request) {
+	drc.request = req
+}
+
 // Attempts to retreive a device profile based on the current headers
 func (drc *DRClient) GetProfileFromHeaders() bool {
 
@@ -343,7 +395,7 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		// the analytics requests to HQ and empty the buffer
 		if len(drc.profileHits) >= drc.profileHitsBuffer {
 			go func() {
-				drc.ReportAnalyticsToHQ()
+				drc.ReportAnalyticsToHQ2()
 			}()
 		}
 
@@ -357,14 +409,15 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		}
 
 		browser_id, _ := drc.properties["id.browser"].(string)
+		dr_udid := ""
 
 		drc.profileHits = append(drc.profileHits, &PageVisit{
-			ts:          int32(time.Now().Unix()),
-			drBrowserId: browser_id,
-			pageUrl:     "http://pageurl.com",
-			drUdid:      "asdf1234",
-			userAgent:   u,
-			referrer:    referrer,
+			TS:          int32(time.Now().Unix()),
+			DrBrowserId: browser_id,
+			PageUrl:     "http://pageurl.com",
+			DrUdid:      dr_udid,
+			UA:          u,
+			Referrer:    referrer,
 		})
 
 		return true
