@@ -27,6 +27,7 @@ const (
 )
 
 type DRClient struct {
+	config            map[string]string
 	baseUrl           string
 	actionDetect      string
 	actionTestHeaders string
@@ -146,6 +147,7 @@ func InitClient() *DRClient {
 
 	/* Initialize an instance of the client */
 	drc := &DRClient{
+		config:            map[string]string{},
 		baseUrl:           "",
 		actionDetect:      "",
 		actionTestHeaders: "",
@@ -172,6 +174,8 @@ func (drc *DRClient) loadConf() {
 	drc.baseUrl = conf["base_url"]
 	drc.actionDetect = conf["action_detect"]
 	drc.actionTestHeaders = conf["action_test_headers"]
+	drc.config = conf
+
 	dm, err := strconv.Atoi(conf["debug"])
 	if err == nil {
 		drc.debugMode = dm
@@ -307,32 +311,26 @@ func (drc *DRClient) ReportAnalyticsToHQ() {
 
 func (drc *DRClient) ReportAnalyticsToHQ2() {
 
-	apiUrl := "http://httpbin.org/post"
+	apiUrl := drc.config["analytics_reporting_url"]
 
 	var pv []string
+	var pvt []*PageVisit
+
+	drc.mutex.Lock()
 	for _, v := range drc.profileHits {
 		ov := *v
+		pvt = append(pvt, &ov)
 		val, _ := json.Marshal(ov)
 		fmt.Println("\tVal:", string(val))
 		pv = append(pv, string(val))
 	}
+	drc.mutex.Unlock()
 
 	// Reset the pagve visits
 	fmt.Println("Profile hits:", len(drc.profileHits))
 	fmt.Println("Resetting profile hits!")
 	drc.profileHits = []*PageVisit{}
 	fmt.Println("Profile hits:", len(drc.profileHits))
-
-	//fmt.Println("Val2:", pv)
-
-	// Copy the profile hits to a temp slice
-	// then emtpy the active slice
-	/*
-		drc.mutex.Lock()
-		var pvt []*PageVisit
-		drc.profileHits = make([]*PageVisit, drc.profileHitsBuffer)
-		drc.mutex.Unlock()
-	*/
 
 	buf, _ := json.Marshal(pv)
 	body := bytes.NewBuffer(buf)
@@ -341,7 +339,6 @@ func (drc *DRClient) ReportAnalyticsToHQ2() {
 
 	fmt.Println("Response:", string(response))
 	/*
-		fmt.Println("Slice:", drc.profileHits)
 		fmt.Println("Body:", body)
 		fmt.Println("Status:", r.Status)
 		fmt.Println("Response:", string(response))
@@ -393,7 +390,8 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 
 		// Now check if the buffer is full, if so, then send
 		// the analytics requests to HQ and empty the buffer
-		if len(drc.profileHits) >= drc.profileHitsBuffer {
+		intval, _ := strconv.Atoi(drc.config["profile_hits_buffer"])
+		if len(drc.profileHits) >= intval {
 			go func() {
 				drc.ReportAnalyticsToHQ2()
 			}()
@@ -403,9 +401,9 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		// We will use the DR browser ID (id.browser)
 
 		referrer := ""
-		_, hasReferrer := drc.properties["Referrer"]
+		_, hasReferrer := drc.headers["Referrer"]
 		if hasReferrer {
-			referrer = drc.properties["Referrer"].(string)
+			referrer = drc.headers["Referrer"].(string)
 		}
 
 		browser_id, _ := drc.properties["id.browser"].(string)
@@ -414,7 +412,7 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		drc.profileHits = append(drc.profileHits, &PageVisit{
 			TS:          int32(time.Now().Unix()),
 			DrBrowserId: browser_id,
-			PageUrl:     "http://pageurl.com",
+			PageUrl:     drc.headers["X-Requested-Page"].(string),
 			DrUdid:      dr_udid,
 			UA:          u,
 			Referrer:    referrer,
