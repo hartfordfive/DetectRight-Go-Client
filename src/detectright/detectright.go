@@ -311,7 +311,7 @@ func (drc *DRClient) ReportAnalyticsToHQ() {
 
 func (drc *DRClient) ReportAnalyticsToHQ2() {
 
-	apiUrl := drc.config["analytics_reporting_url"]
+	apiUrl := drc.config["analytics_reporting_url"] + "?k=" + drc.apiKey
 
 	var pv []string
 	var pvt []*PageVisit
@@ -327,26 +327,43 @@ func (drc *DRClient) ReportAnalyticsToHQ2() {
 	drc.mutex.Unlock()
 
 	// Reset the pagve visits
-	fmt.Println("Profile hits:", len(drc.profileHits))
-	fmt.Println("Resetting profile hits!")
+	if drc.debugMode == 1 {
+		fmt.Println("Profile hits:", len(drc.profileHits))
+		fmt.Println("Resetting profile hits!")
+	}
 	drc.profileHits = []*PageVisit{}
-	fmt.Println("Profile hits:", len(drc.profileHits))
 
 	buf, _ := json.Marshal(pv)
 	body := bytes.NewBuffer(buf)
 	r, _ := http.Post(apiUrl, "application/json", body)
 	response, _ := ioutil.ReadAll(r.Body)
 
-	fmt.Println("Response:", string(response))
-	/*
+	if drc.debugMode == 1 {
+		fmt.Println("Response:", string(response))
 		fmt.Println("Body:", body)
 		fmt.Println("Status:", r.Status)
 		fmt.Println("Response:", string(response))
-	*/
+	}
+
 }
 
 func (drc *DRClient) SetHttpRequest(req *http.Request) {
 	drc.request = req
+}
+
+func (drc *DRClient) getCookie(cookieName string) string {
+
+	cookie := drc.request.Header.Get("Cookie")
+	if cookie != "" {
+		cookies := strings.Split(cookie, "; ")
+		for i := 0; i < len(cookies); i++ {
+			parts := strings.Split(cookies[i], "=")
+			if parts[0] == cookieName {
+				return parts[1]
+			}
+		}
+	}
+	return ""
 }
 
 // Attempts to retreive a device profile based on the current headers
@@ -407,7 +424,7 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		}
 
 		browser_id, _ := drc.properties["id.browser"].(string)
-		dr_udid := ""
+		dr_udid := drc.getCookie("udid")
 
 		drc.profileHits = append(drc.profileHits, &PageVisit{
 			TS:          int32(time.Now().Unix()),

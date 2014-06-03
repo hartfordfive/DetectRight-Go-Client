@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -39,15 +40,36 @@ func (rh *RequestHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) 
 
 	// Initialize the DetectRigh Go client
 	//drc := detectright.InitClient()
+	dr_udid := ""
+	cookie := req.Header.Get("Cookie")
+	if cookie != "" {
+		cookies := strings.Split(cookie, "; ")
+		for i := 0; i < len(cookies); i++ {
+			parts := strings.Split(cookies[i], "=")
+			if parts[0] == "udid" {
+				dr_udid = parts[1]
+				break
+			}
+		}
+	}
+
+	if dr_udid == "" {
+		y, m, d := time.Now().Date()
+		expiryTime := time.Date(y, m, d+365, 0, 0, 0, 0, time.UTC)
+		req.Header.Set("Set-Cookie", "udid=###itworks###; Domain=localhost; Path=/; Expires="+expiryTime.Format(time.RFC1123))
+	}
 
 	// Store all the headers from the current request in header map
 	drcHeaders := make(map[string]interface{})
 	for k, v := range req.Header {
 		drcHeaders[k] = v[0]
 	}
+	// Add this custom header to include the current requested page
+	drcHeaders["X-Requested-Page"] = req.URL.Path
 
 	// Sets the headers of the current rquest
 	drc.SetHeaders(drcHeaders)
+	drc.SetHttpRequest(req)
 
 	// Fetches the device profile from HQ with the collected headers
 	drc.GetProfileFromHeaders()
