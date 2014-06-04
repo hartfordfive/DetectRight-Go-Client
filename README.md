@@ -37,8 +37,10 @@ drc.GetProfileFromHeaders()
 response := drc.GetProperties()
 </code></pre>
 
+## Version Highlights
+=======================
 
-## Future Roadmap
-===================
-- Add in process caching in order to speed up retreive of device profiles
-- Create in-memory device profile access counter in order to accumulate stats and send back to DR HQ for analytics puproses.
+###V 0.3.0-beta:
+- Added in process device profile caching
+- Added cache_ttl parameter to config
+- Added analytics reporting for cached device profiles
