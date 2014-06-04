@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	VERSION_MAJOR  int    = 0
-	VERSION_MINOR  int    = 2
-	VERSION_PATCH  int    = 0
-	VERSION_SUFFIX string = "beta"
-	CACHE_TTL_MINS int    = 5
+	VERSION_MAJOR          int    = 0
+	VERSION_MINOR          int    = 3
+	VERSION_PATCH          int    = 0
+	VERSION_SUFFIX         string = "beta"
+	DEFAULT_CACHE_TTL_MINS int    = 5
 )
 
 type DRClient struct {
@@ -272,46 +272,7 @@ func (drc *DRClient) SetHeadersFromUA(userAgent string) {
 
 func (drc *DRClient) ReportAnalyticsToHQ() {
 
-	apiUrl := "http://www.whatsmydevice.mobi"
-	resource := "/analytics/"
-	data := url.Values{}
-
-	var pv []PageVisit
-
-	for _, v := range drc.profileHits {
-		pv = append(pv, *v)
-	}
-
-	fmt.Println(pv)
-
-	payload, err := json.Marshal(pv)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Payload to send:", string(payload))
-	data.Set("data", string(payload))
-
-	u, _ := url.ParseRequestURI(apiUrl)
-	u.Path = resource
-	urlStr := fmt.Sprintf("%v", u) // "https://api.com/user/"
-
-	client := &http.Client{}
-	r, _ := http.NewRequest("POST", urlStr, bytes.NewBufferString(data.Encode())) // <-- URL-encoded payload
-	r.Header.Add("Authorization", "auth_token=\"XXXXXXX\"")
-	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-
-	resp, _ := client.Do(r)
-	fmt.Println(resp.Status)
-
-	drc.profileHits = make([]*PageVisit, drc.profileHitsBuffer)
-
-}
-
-func (drc *DRClient) ReportAnalyticsToHQ2() {
-
-	apiUrl := drc.config["analytics_reporting_url"] + "?k=" + drc.apiKey
+	apiUrl := drc.config["analytics_reporting_url"]
 
 	var pv []string
 	var pvt []*PageVisit
@@ -333,16 +294,22 @@ func (drc *DRClient) ReportAnalyticsToHQ2() {
 	}
 	drc.profileHits = []*PageVisit{}
 
-	buf, _ := json.Marshal(pv)
-	body := bytes.NewBuffer(buf)
-	r, _ := http.Post(apiUrl, "application/json", body)
-	response, _ := ioutil.ReadAll(r.Body)
+	jsonEncoded, _ := json.Marshal(pv)
 
+	data := url.Values{}
+	data.Set("data", string(jsonEncoded))
+
+	client := &http.Client{}
+	r, _ := http.NewRequest("POST", apiUrl, bytes.NewBufferString(data.Encode())) // <-- URL-encoded payload
+	r.Header.Add("X-DR-API-KEY", drc.apiKey)
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+
+	resp, _ := client.Do(r)
+	responseBody, _ := ioutil.ReadAll(resp.Body)
 	if drc.debugMode == 1 {
-		fmt.Println("Response:", string(response))
-		fmt.Println("Body:", body)
-		fmt.Println("Status:", r.Status)
-		fmt.Println("Response:", string(response))
+		fmt.Println("Response Code:", resp.Status)
+		fmt.Println("Response Body:\n", string(responseBody))
 	}
 
 }
@@ -410,7 +377,7 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 		intval, _ := strconv.Atoi(drc.config["profile_hits_buffer"])
 		if len(drc.profileHits) >= intval {
 			go func() {
-				drc.ReportAnalyticsToHQ2()
+				drc.ReportAnalyticsToHQ()
 			}()
 		}
 
@@ -468,7 +435,8 @@ func (drc *DRClient) GetProfileFromHeaders() bool {
 	// Store in local cache
 	jsonObject, _ := json.Marshal(profile)
 
-	drc.localCache.Set(uaHash, string(jsonObject), time.Minute*5)
+	cache_ttl, _ := strconv.Atoi(drc.config["cache_ttl"])
+	drc.localCache.Set(uaHash, string(jsonObject), time.Minute*time.Duration(cache_ttl))
 
 	drc.properties = profile
 	drc.properties["profile_source"] = "api"
